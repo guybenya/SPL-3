@@ -1,7 +1,9 @@
 package bgu.spl.net.srv;
 
 import bgu.spl.net.api.MessageEncoderDecoder;
-import bgu.spl.net.api.MessagingProtocol;
+// ORIGINAL: import bgu.spl.net.api.MessagingProtocol;
+// CHANGED TO: Use StompMessagingProtocol instead of the general MessagingProtocol
+import bgu.spl.net.api.StompMessagingProtocol;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.channels.ClosedSelectorException;
@@ -15,7 +17,9 @@ import java.util.function.Supplier;
 public class Reactor<T> implements Server<T> {
 
     private final int port;
-    private final Supplier<MessagingProtocol<T>> protocolFactory;
+    // ORIGINAL: private final Supplier<MessagingProtocol<T>> protocolFactory;
+    // CHANGED TO: Updated to StompMessagingProtocol
+    private final Supplier<StompMessagingProtocol<T>> protocolFactory;
     private final Supplier<MessageEncoderDecoder<T>> readerFactory;
     private final ActorThreadPool pool;
     private Selector selector;
@@ -23,16 +27,29 @@ public class Reactor<T> implements Server<T> {
     private Thread selectorThread;
     private final ConcurrentLinkedQueue<Runnable> selectorTasks = new ConcurrentLinkedQueue<>();
 
+    // ADDED: Connections manager field to handle connected clients
+    private final Connections<T> connections;
+
+    // ORIGINAL:
+    // public Reactor(
+    //         int numThreads,
+    //         int port,
+    //         Supplier<MessagingProtocol<T>> protocolFactory,
+    //         Supplier<MessageEncoderDecoder<T>> readerFactory) {
+    // CHANGED TO: Updated constructor signature and initialized connections map
     public Reactor(
             int numThreads,
             int port,
-            Supplier<MessagingProtocol<T>> protocolFactory,
+            Supplier<StompMessagingProtocol<T>> protocolFactory,
             Supplier<MessageEncoderDecoder<T>> readerFactory) {
 
         this.pool = new ActorThreadPool(numThreads);
         this.port = port;
         this.protocolFactory = protocolFactory;
         this.readerFactory = readerFactory;
+        
+        // ADDED: Initialize the connections instance
+        this.connections = new ConnectionsImpl<>();
     }
 
     @Override
@@ -95,11 +112,24 @@ public class Reactor<T> implements Server<T> {
     private void handleAccept(ServerSocketChannel serverChan, Selector selector) throws IOException {
         SocketChannel clientChan = serverChan.accept();
         clientChan.configureBlocking(false);
+        
+        // ORIGINAL:
+        // final NonBlockingConnectionHandler<T> handler = new NonBlockingConnectionHandler<>(
+        //         readerFactory.get(),
+        //         protocolFactory.get(),
+        //         clientChan,
+        //         this);
+        // CHANGED TO: Create protocol instance first, pass it to handler, add to connections and call start() before proceeding
+        StompMessagingProtocol<T> protocol = protocolFactory.get();
         final NonBlockingConnectionHandler<T> handler = new NonBlockingConnectionHandler<>(
                 readerFactory.get(),
-                protocolFactory.get(),
+                protocol,
                 clientChan,
                 this);
+                
+        int connectionId = connections.addClient(handler);
+        protocol.start(connectionId, connections);
+        
         clientChan.register(selector, SelectionKey.OP_READ, handler);
     }
 

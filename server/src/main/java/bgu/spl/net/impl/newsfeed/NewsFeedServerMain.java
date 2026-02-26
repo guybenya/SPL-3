@@ -9,12 +9,16 @@ public class NewsFeedServerMain {
     public static void main(String[] args) {
         NewsFeed feed = new NewsFeed(); //one shared object
 
-        // you can use any server... 
-        Server.threadPerClient(
-                7777, //port
-                () -> new RemoteCommandInvocationProtocol<>(feed), //protocol factory
-                ObjectEncoderDecoder::new //message encoder decoder factory
-        ).serve();
+        // ORIGINAL:
+        // // you can use any server... 
+        // Server.threadPerClient(
+        //         7777, //port
+        //         () -> new RemoteCommandInvocationProtocol<>(feed), //protocol factory
+        //         ObjectEncoderDecoder::new //message encoder decoder factory
+        // ).serve();
+        // CHANGED TO: Commented out the active threadPerClient block to avoid compilation errors with StompMessagingProtocol
+
+        System.out.println("NewsFeedServer is disabled. Please run StompServer instead.");
 
         // Server.reactor(
         //         Runtime.getRuntime().availableProcessors(),
