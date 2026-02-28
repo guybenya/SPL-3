@@ -2,6 +2,11 @@ package bgu.spl.net.impl.stomp;
 
 import bgu.spl.net.srv.Server;
 
+// --- NEW CODE ---
+import bgu.spl.net.impl.data.Database;
+import java.util.Scanner;
+// ----------------
+
 public class StompServer {
 
     public static void main(String[] args) {
@@ -23,6 +28,23 @@ public class StompServer {
 
         // Parse the server type from the second argument
         String serverType = args[1].toLowerCase();
+
+        // --- NEW CODE ---
+        // Start a background thread to listen for console commands (like "report")
+        Thread cliThread = new Thread(() -> {
+            Scanner scanner = new Scanner(System.in);
+            System.out.println("Server Console: Type 'report' to print the database report.");
+            while (scanner.hasNextLine()) {
+                String line = scanner.nextLine().trim();
+                if (line.equalsIgnoreCase("report")) {
+                    Database.getInstance().printReport();
+                }
+            }
+            scanner.close();
+        });
+        cliThread.setDaemon(true); // Ensures this thread doesn't prevent the JVM from exiting
+        cliThread.start();
+        // ----------------
 
         // Initialize and start the requested server type
         if (serverType.equals("tpc")) {

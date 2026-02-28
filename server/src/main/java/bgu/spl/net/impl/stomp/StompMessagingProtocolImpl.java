@@ -116,10 +116,17 @@ public class StompMessagingProtocolImpl implements StompMessagingProtocol<String
         // Keep track of the subscription ID for this specific client
         subIdToTopic.put(id, destination);
 
-        // We cast to ConnectionsImpl because the base Connections interface lacks a subscribe method
-        // It is recommended to add subscribe and unsubscribe to the Connections interface directly
+        // --- OLD CODE ---
+        // // We cast to ConnectionsImpl because the base Connections interface lacks a subscribe method
+        // // It is recommended to add subscribe and unsubscribe to the Connections interface directly
+        // if (connections instanceof ConnectionsImpl) {
+        //     ((ConnectionsImpl<String>) connections).subscribe(destination, connectionId);
+        // }
+        
+        // --- NEW CODE ---
+        // We cast to ConnectionsImpl to use the updated subscribe method that takes the unique subscription ID.
         if (connections instanceof ConnectionsImpl) {
-            ((ConnectionsImpl<String>) connections).subscribe(destination, connectionId);
+            ((ConnectionsImpl<String>) connections).subscribe(destination, connectionId, id);
         }
 
         sendReceiptIfNeeded(frame);
@@ -150,15 +157,35 @@ public class StompMessagingProtocolImpl implements StompMessagingProtocol<String
             sendError("Malformed frame", "SEND requires a destination header", frame);
             return;
         }
+        
+        // --- NEW CODE ---
+        // File Tracking Integration: Check if this SEND frame is a game report (contains "user" header)
+        String reportUser = frame.getHeader("user");
+        if (reportUser != null) {
+            // Retrieve filename if the client provided it as a header, otherwise use a default placeholder
+            String filename = frame.getHeader("file");
+            if (filename == null) {
+                filename = "unknown_file";
+            }
+            Database.getInstance().trackFileUpload(reportUser, filename, destination);
+        }
+        // ----------------
 
         // Construct the MESSAGE frame that will be broadcasted to all subscribers
         Map<String, String> messageHeaders = new HashMap<>();
         messageHeaders.put("destination", destination);
         messageHeaders.put("message-id", String.valueOf(messageIdCounter.getAndIncrement()));
         
-        // Note for SPL3: According to STOMP, each client should receive their unique subscription ID
-        // Since ConnectionsImpl broadcasts the exact same string to everyone, we place the topic name here
-        // A complete solution would modify ConnectionsImpl to format the message per-client
+        // --- OLD CODE ---
+        // // Note for SPL3: According to STOMP, each client should receive their unique subscription ID
+        // // Since ConnectionsImpl broadcasts the exact same string to everyone, we place the topic name here
+        // // A complete solution would modify ConnectionsImpl to format the message per-client
+        // messageHeaders.put("subscription", destination); 
+        
+        // --- NEW CODE ---
+        // We place the channel name (destination) as a placeholder in the subscription header.
+        // ConnectionsImpl will dynamically replace "subscription:<destination>" with the client's 
+        // unique subscription ID before sending it over the socket.
         messageHeaders.put("subscription", destination); 
 
         StompFrame messageFrame = new StompFrame("MESSAGE", messageHeaders, frame.getBody());

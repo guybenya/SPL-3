@@ -12,7 +12,7 @@ public interface Connections<T> {
 
     // addition methods
 
-    void subscribe(String channel, int connectionId);
+    void subscribe(String channel, int connectionId, String subscriptionId);
 
     void unsubscribe(String channel, int connectionId);
 
